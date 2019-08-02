@@ -160,6 +160,9 @@ protected:
 
     void set_name_mangling_mode(NameMangling mode);
 
+    void generate_function_declaration_for_single_kernel_for_AI(
+            const LoweredFunc &f, const std::vector<Buffer<>> &buffer);
+
     using IRPrinter::visit;
 
     void visit(const Variable *) override;

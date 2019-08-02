@@ -1425,6 +1425,11 @@ Stage &Stage::unroll(VarOrRVar var) {
     return *this;
 }
 
+Stage &Stage::prepare_for_software_pipelining(VarOrRVar var) {
+    set_dim_type(var, ForType::PrepareForSoftwarePipelining);
+    return *this;
+}
+
 Stage &Stage::parallel(VarOrRVar var, Expr factor, TailStrategy tail) {
     if (var.is_rvar) {
         RVar tmp;
@@ -2356,12 +2361,28 @@ Func &Func::reorder_storage(Var x, Var y) {
     vector<StorageDim> &dims = func.schedule().storage_dims();
     bool found_y = false;
     size_t y_loc = 0;
+    debug(1) << "Initial storage order:\n";
+    for(size_t i = 0; i < dims.size(); i++) {
+        debug(1) << dims[i].var << "\t";
+    }
+
+    debug(1) << "\n";
+
+    debug(1) << "Storage names: " << x.name() << "," << y.name() << "\n";
     for (size_t i = 0; i < dims.size(); i++) {
+        debug(1) << "Storage dimension name: " << dims[i].var << "\n";
         if (var_name_match(dims[i].var, y.name())) {
             found_y = true;
             y_loc = i;
         } else if (var_name_match(dims[i].var, x.name())) {
             if (found_y) std::swap(dims[i], dims[y_loc]);
+
+            debug(1) << "Final storage order:\n";
+            for(size_t i = 0; i < dims.size(); i++) {
+                debug(1) << dims[i].var << "\t";
+            }
+
+            debug(1) << "\n";
             return *this;
         }
     }
@@ -2379,6 +2400,7 @@ Func &Func::reorder_storage(const std::vector<Var> &dims, size_t start) {
     if ((dims.size() - start) > 2) {
         reorder_storage(dims, start + 1);
     }
+
     return *this;
 }
 

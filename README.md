@@ -1,3 +1,8 @@
+# XHalide
+Halide framework to generate ME single core code for convolution-like kernels
+-- Now working on 16-bit
+
+
 # Halide
 
 Halide is a programming language designed to make it easier to write
@@ -386,3 +391,5 @@ Now build and run the blur example using the script to run it on device:
 
     export HL_HEXAGON_TOOLS=$SDK_LOC/HEXAGON_Tools/8.0/Tools/
     HL_TARGET=arm-64-android-hvx_128 ./adb_run_on_device.sh
+=======
+

@@ -935,7 +935,8 @@ private:
             llvm::StringRef name;
             iter->getName(name);
             debug(2) << "Section: " << name.str() << "\n";
-#if LLVM_VERSION >= 90
+
+#if LLVM_VERSION >= 100
             // ignore errors, just leave strings empty
             auto e = iter->getContents();
             if (e) {
@@ -964,6 +965,7 @@ private:
                 iter->getContents(debug_ranges);
             }
 #endif
+
         }
 
         if (debug_info.empty() ||

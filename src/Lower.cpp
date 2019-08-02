@@ -1,10 +1,12 @@
 #include <algorithm>
 #include <iostream>
+#include <fstream>
 #include <set>
 #include <sstream>
 
 #include "Lower.h"
 
+#include "AlignLoads.h"
 #include "AddImageChecks.h"
 #include "AddParameterChecks.h"
 #include "AllocationBoundsInference.h"

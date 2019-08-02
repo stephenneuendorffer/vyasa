@@ -293,6 +293,7 @@ const std::map<std::string, Target::Arch> arch_name_map = {
     {"hexagon", Target::Hexagon},
     {"wasm", Target::WebAssembly},
     {"riscv", Target::RISCV},
+    {"AI", Target::AI},
 };
 
 bool lookup_arch(const std::string &tok, Target::Arch &result) {

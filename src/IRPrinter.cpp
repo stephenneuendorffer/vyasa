@@ -265,6 +265,9 @@ ostream &operator<<(ostream &out, const ForType &type) {
     case ForType::GPULane:
         out << "gpu_lane";
         break;
+    case ForType ::PrepareForSoftwarePipelining:
+        out << "chess_prepare_for_pipelining";
+        break;
     }
     return out;
 }

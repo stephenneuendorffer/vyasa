@@ -172,41 +172,36 @@ function(add_runtime_modules TARGET_RUNTIME_FILES TARGET_RUNTIME_DIR)
       # -std=gnu++98 is deliberate; we do NOT want c++11 here,
       # as we don't want static locals to get thread synchronization stuff.
       add_custom_command(OUTPUT "${LL_D}"
-                         # COMMENT "${SOURCE} -> ${LL_D}"
                          DEPENDS "${SOURCE}"
                          COMMAND ${CLANG} ${CXX_WARNING_FLAGS} ${RUNTIME_DEBUG_FLAG} -DDEBUG_RUNTIME -O3 -fno-ms-compatibility -ffreestanding -fno-blocks -fno-exceptions -fno-unwind-tables -std=gnu++98 -m${j} -target "${TARGET}" "-I${TARGET_RUNTIME_DIR}" -DCOMPILING_HALIDE_RUNTIME "-DLLVM_VERSION=${LLVM_VERSION}" -DBITS_${j} -emit-llvm -S "${SOURCE}" -o "${LL_D}"
+                         COMMENT "${SOURCE} -> ${LL_D}"
                          # Make sure that the output of this command also depends
                          # on the header files that ${SOURCE} uses
                          # FIXME: Only works for makefile generator
                          IMPLICIT_DEPENDS CXX "${SOURCE}"
                         )
       add_custom_command(OUTPUT "${LL}"
-                         # COMMENT "${SOURCE} -> ${LL}"
                          DEPENDS "${SOURCE}"
                          COMMAND ${CLANG} ${CXX_WARNING_FLAGS} -O3 -fno-ms-compatibility -ffreestanding -fno-blocks -fno-exceptions -fno-unwind-tables -std=gnu++98 -m${j} -target "${TARGET}" "-I${TARGET_RUNTIME_DIR}" -DCOMPILING_HALIDE_RUNTIME "-DLLVM_VERSION=${LLVM_VERSION}" -DBITS_${j} -emit-llvm -S "${SOURCE}" -o "${LL}"
-                         )
+                         COMMENT "${SOURCE} -> ${LL}")
 
       add_custom_command(OUTPUT "${BC_D}"
-                         # COMMENT "${LL_D} -> ${BC_D}"
                          DEPENDS "${LL_D}"
                          COMMAND "${LLVM_AS}" "${LL_D}" -o "${BC_D}"
-                         )
+                         COMMENT "${LL_D} -> ${BC_D}")
       add_custom_command(OUTPUT "${BC}"
-                         # COMMENT "${LL} -> ${BC}"
                          DEPENDS "${LL}"
                          COMMAND "${LLVM_AS}" "${LL}" -o "${BC}"
-                         )
+                         COMMENT "${LL} -> ${BC}")
 
       add_custom_command(OUTPUT "${INITMOD_D}"
-                         # COMMENT "${BC_D} -> ${INITMOD_D}"
-                         DEPENDS "${BC_D}" binary2cpp
+                         DEPENDS "${BC_D}"
                          COMMAND binary2cpp "halide_internal_initmod_${i}_${j}_debug" < "${BC_D}" > "${INITMOD_D}"
-                         )
+                         COMMENT "${BC_D} -> ${INITMOD_D}")
       add_custom_command(OUTPUT "${INITMOD}"
-                         # COMMENT "${BC} -> ${INITMOD}"
-                         DEPENDS "${BC}" binary2cpp
+                         DEPENDS "${BC}"
                          COMMAND binary2cpp "halide_internal_initmod_${i}_${j}" < "${BC}" > "${INITMOD}"
-                         )
+                         COMMENT "${BC} -> ${INITMOD}")
       list(APPEND INITIAL_MODULES ${INITMOD})
       list(APPEND INITIAL_MODULES ${INITMOD_D})
     endforeach()
@@ -223,32 +218,28 @@ foreach (i ${RUNTIME_LL} )
   set(BC "${PROJECT_BINARY_DIR}/${PROJECT_NAME}.build/${NATIVE_INT_DIR}initmod.${i}.bc")
   set(INITMOD "${INITMOD_PREFIX}${i}.cpp")
   add_custom_command(OUTPUT "${BC}"
-                     # COMMENT "${LL} -> ${BC}"
                      DEPENDS "${LL}"
                      COMMAND "${LLVM_AS}" "${LL}" -o "${BC}"
-                     )
+                     COMMENT "${LL} -> ${BC}")
   add_custom_command(OUTPUT "${INITMOD}"
-                     # COMMENT "${BC} -> ${INITMOD}"
-                     DEPENDS "${BC}" binary2cpp
+                     DEPENDS "${BC}"
                      COMMAND binary2cpp "halide_internal_initmod_${i}_ll" < "${BC}" > "${INITMOD}"
-                     )
+                     COMMENT "${BC} -> ${INITMOD}")
   list(APPEND INITIAL_MODULES "${INITMOD}")
 endforeach()
 foreach (i ${RUNTIME_BC} )
   set(INITMOD "${INITMOD_PREFIX}ptx_${i}.cpp")
   add_custom_command(OUTPUT "${INITMOD}"
-                     # COMMENT "Building initial module ptx_${i}..."
-                     DEPENDS binary2cpp
                      COMMAND binary2cpp "halide_internal_initmod_ptx_${i}_ll" < "${NATIVE_RUNTIME_DIR}nvidia_libdevice_bitcode/libdevice.${i}.10.bc" > "${INITMOD}"
+                     COMMENT "Building initial module ptx_${i}..."
                      VERBATIM)
   list(APPEND INITIAL_MODULES "${INITMOD}")
 endforeach()
 
 add_custom_command(OUTPUT "${INITMOD_PREFIX}inlined_c.cpp"
-  # COMMENT "buffer_t.cpp -> ${INITMOD_PREFIX}inlined_c.cpp"
-  DEPENDS "${NATIVE_RUNTIME_DIR}buffer_t.cpp" binary2cpp
+  DEPENDS "${NATIVE_RUNTIME_DIR}buffer_t.cpp"
   COMMAND binary2cpp "halide_internal_initmod_inlined_c" < "${NATIVE_RUNTIME_DIR}buffer_t.cpp" > "${INITMOD_PREFIX}inlined_c.cpp"
-  )
+  COMMENT "buffer_t.cpp -> ${INITMOD_PREFIX}inlined_c.cpp")
 list(APPEND INITIAL_MODULES "${INITMOD_PREFIX}inlined_c.cpp")
 
 set(RUNTIME_HEADER_FILES
@@ -268,10 +259,9 @@ set(RUNTIME_HEADER_FILES
 foreach (i ${RUNTIME_HEADER_FILES})
   string(REPLACE "." "_" SYM_NAME "${i}")
   add_custom_command(OUTPUT "${INITMOD_PREFIX}${SYM_NAME}.cpp"
-    # COMMENT "${i} -> ${INITMOD_PREFIX}${SYM_NAME}.cpp"
-    DEPENDS "${NATIVE_RUNTIME_DIR}${i}" binary2cpp
+    DEPENDS "${NATIVE_RUNTIME_DIR}${i}"
     COMMAND binary2cpp "halide_internal_runtime_header_${SYM_NAME}" < "${NATIVE_RUNTIME_DIR}${i}" > "${INITMOD_PREFIX}${SYM_NAME}.cpp"
-    )
+    COMMENT "${i} -> ${INITMOD_PREFIX}${SYM_NAME}.cpp")
   list(APPEND INITIAL_MODULES "${INITMOD_PREFIX}${SYM_NAME}.cpp")
 endforeach()
 
@@ -317,6 +307,7 @@ set(HEADER_FILES
   CodeGen_X86.h
   ConciseCasts.h
   CPlusPlusMangle.h
+  ConvolutionsCompilerForAICore.h
   CSE.h
   Debug.h
   DebugArguments.h
@@ -492,6 +483,7 @@ add_library(Halide ${HALIDE_LIBRARY_TYPE}
   CodeGen_RISCV.cpp
   CodeGen_WebAssembly.cpp
   CodeGen_X86.cpp
+  ConvolutionsCompilerForAICore.cpp
   CPlusPlusMangle.cpp
   CSE.cpp
   Debug.cpp
@@ -631,7 +623,12 @@ target_compile_options(Halide PUBLIC $<$<CXX_COMPILER_ID:MSVC>:/MP>)
 
 # Define Halide_SHARED or Halide_STATIC depending on library type
 target_compile_definitions(Halide PRIVATE "-DHalide_${HALIDE_LIBRARY_TYPE}")
-add_dependencies(Halide HalideIncludes)
+# Ensure that these tools are build first
+add_dependencies(Halide
+  binary2cpp
+  build_halide_h
+  HalideIncludes
+)
 
 # List of LLVM Components required
 # This list will be appended to depending on the targets we need to support

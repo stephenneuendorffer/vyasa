@@ -1200,13 +1200,13 @@ void CodeGen_LLVM::optimize_module() {
     PipelineTuningOptions pto;
     pto.LoopInterleaving = !get_target().has_feature(Target::DisableLLVMLoopUnroll);
     pto.LoopVectorization = !get_target().has_feature(Target::DisableLLVMLoopVectorize);
-    pto.LoopUnrolling = pto.LoopInterleaving;
+    //Prasanth: pto.LoopUnrolling = pto.LoopInterleaving;
     // Clear ScEv info for all loops. Certain Halide applications spend a very
     // long time compiling in forgetLoop, and prefer to forget everything
     // and rebuild SCEV (aka "Scalar Evolution") from scratch.
     // Sample difference in compile time reduction at the time of this change was
     // 21.04 -> 14.78 using current ToT release build. (See also https://reviews.llvm.org/rL358304)
-    pto.ForgetAllSCEVInLoopUnroll = true;
+    //Prasanth: pto.ForgetAllSCEVInLoopUnroll = true;
 
     // Note: pto exists only for LLVM_VERSION >= 90
     llvm::PassBuilder pb(tm.get(), pto);

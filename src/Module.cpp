@@ -5,6 +5,7 @@
 #include <future>
 
 #include "CodeGen_C.h"
+#include "ConvolutionsCompilerForAICore.h"
 #include "CodeGen_Internal.h"
 #include "Debug.h"
 #include "HexagonOffload.h"
@@ -522,11 +523,20 @@ void Module::compile(const Outputs &output_files_arg) const {
     if (!output_files.c_source_name.empty()) {
         debug(1) << "Module.compile(): c_source_name " << output_files.c_source_name << "\n";
         std::ofstream file(output_files.c_source_name);
-        Internal::CodeGen_C cg(file,
-                               target(),
-                               target().has_feature(Target::CPlusPlusMangling) ?
-                               Internal::CodeGen_C::CPlusPlusImplementation : Internal::CodeGen_C::CImplementation);
-        cg.compile(*this);
+        if(target().arch == Target::AI) {
+            debug(2) <<"Generating compilable c-code for AI architecture \n";
+            Internal::ConvolutionsCompilerForAICore cg(file,
+                                   target(),
+                                   target().has_feature(Target::CPlusPlusMangling) ?
+                                   Internal::CodeGen_C::CPlusPlusImplementation : Internal::CodeGen_C::CImplementation);
+            cg.compile(*this);
+        } else {
+            Internal::CodeGen_C cg(file,
+                                   target(),
+                                   target().has_feature(Target::CPlusPlusMangling) ?
+                                   Internal::CodeGen_C::CPlusPlusImplementation : Internal::CodeGen_C::CImplementation);
+            cg.compile(*this);
+        }
     }
     if (!output_files.python_extension_name.empty()) {
         debug(1) << "Module.compile(): python_extension_name " << output_files.python_extension_name << "\n";

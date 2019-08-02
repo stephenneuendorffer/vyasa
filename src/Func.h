@@ -332,6 +332,7 @@ public:
     Stage &parallel(VarOrRVar var);
     Stage &vectorize(VarOrRVar var);
     Stage &unroll(VarOrRVar var);
+    Stage &prepare_for_software_pipelining(VarOrRVar var);
     Stage &parallel(VarOrRVar var, Expr task_size, TailStrategy tail = TailStrategy::Auto);
     Stage &vectorize(VarOrRVar var, Expr factor, TailStrategy tail = TailStrategy::Auto);
     Stage &unroll(VarOrRVar var, Expr factor, TailStrategy tail = TailStrategy::Auto);
@@ -1435,6 +1436,9 @@ public:
      * dimension following a split by a constant factor. For most uses
      * of unroll you want the two-argument form. */
     Func &unroll(VarOrRVar var);
+
+    /** Mark a dimension to be prepared for pipleining. This will be fed to chess compiler. */
+    Func &prepare_for_software_pipelining(VarOrRVar var);
 
     /** Split a dimension by the given factor, then vectorize the
      * inner dimension. This is how you vectorize a loop of unknown
