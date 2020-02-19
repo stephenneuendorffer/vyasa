@@ -1,0 +1,12 @@
+<project name="Project" processor="me">
+    <file type="c" name="naive.cc" path=""/>
+    <file type="c" name="main.cc" path=""/>
+    <file type="c" name="xhalide_generated.cc" path=""/>
+    <issinit>fileinput add SS0 0 -field -file ./data/kernelAndInImage_256x16_k3_gaussblur.txt -interval_files {} -position 0 -type {} -radix decimal -filter {} -break_on_wrap 0 -cycle_based 0 -format integer -gen_vcd_event 0 -structured 0 -bin_nbr_bytes 4 -bin_lsb_first 0
+fileinput add SS1 0 -field -file ./data/refImage_256x16_k3_gaussblur.txt -interval_files {} -position 0 -type {} -radix decimal -filter {} -break_on_wrap 0 -cycle_based 0 -format integer -gen_vcd_event 0 -structured 0 -bin_nbr_bytes 4 -bin_lsb_first 0</issinit>
+    <option id="backend.mist2.xargs" value="-ggraph +A" inherit="1"/>
+    <option id="cpp.define" value="__AIENGINE__" inherit="1"/>
+    <option id="cpp.include" value="." inherit="1"/>
+    <option id="project.name" value="conv"/>
+    <option id="project.type" value="exe"/>
+</project>
