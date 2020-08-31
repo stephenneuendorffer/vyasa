@@ -334,7 +334,7 @@ namespace Halide {
               else if(reuse > 0)
                 reuse = reuse / load_a_ramp_stride + 1;
 
-              debug(2) << "Number of Reuse elements b/w"
+              debug(4) << "Number of Reuse elements b/w"
                        << Expr(a) << " and " << Expr(b) << " are " << reuse
                        << " , " <<offset << "\n";
               if(reuse > 0)
@@ -366,7 +366,7 @@ namespace Halide {
               else
                 offset = -1 * diff_int->value;
               int64_t spatial_distance = offset;
-              debug(2) << "Spatial distance b/w"
+              debug(4) << "Spatial distance b/w"
                        << Expr(a) << " and " << Expr(b) << " are " << spatial_distance
                        << " , " <<offset << "\n";
               auto a_remainder = a->alignment.remainder;
@@ -456,6 +456,17 @@ namespace Halide {
               group.extent_size = (int) diff_int->value;
               debug(2) << debug_header_ <<"Group extent size: "
                        << group.extent_size << "\n";
+
+              int extent_size_in_bits = group.extent_size * data_type_size_in_bits_;
+              if(is_temporal_logical_group_smaller_than_256b_ == -1)
+                  is_temporal_logical_group_smaller_than_256b_ = extent_size_in_bits <= 256 ? 1 : 0;
+              else
+                  assert(is_temporal_logical_group_smaller_than_256b_
+                          == ((extent_size_in_bits <= 256) ? 1 : 0));
+
+                debug(3) << debug_header_ <<"Is temporal group size less than 256b: "
+                         << is_temporal_logical_group_smaller_than_256b_ << "\n";
+
               int max_size = 1024 / (data_type_size_in_bits_);
               if(group.extent_size > max_size){
                 debug(0) << debug_header_ <<"[Reuse Analysis Error]: "
@@ -568,10 +579,12 @@ namespace Halide {
 
             //Step-3: Identify connected components, i.e., logical groups
             reuse_graph.ExtractConnectedComponents();
-
+            debug(3) << debug_header_ << "Num. of components: "
+                          << reuse_graph.logical_memory_groups_.size() << "\n";
 
 
             //Step-4: Compute extent of each group to create a vector register for each group
+            vector<LogicalMemoryGroup> physical_memory_groups;
             for (LogicalMemoryGroup  &group : reuse_graph.logical_memory_groups_) {
               group.extent = Interval::nothing();
               for(int &id : group.ids) {
@@ -596,13 +609,59 @@ namespace Halide {
                 group.extent_size = (int) diff_int->value;
                 debug(2) << debug_header_ <<"Group extent size: "
                          << group.extent_size << "\n";
-                int max_size = 1024 / (data_type_size_in_bits_);
+                int max_size_bits = 0;
+                if(is_temporal_logical_group_smaller_than_256b_ == -1)
+                    assert(false);
+                else if(is_temporal_logical_group_smaller_than_256b_ == 1)
+                    max_size_bits = 512;
+                else
+                    max_size_bits = 256;
+
+                int max_size = max_size_bits / (data_type_size_in_bits_);
                 if(group.extent_size > max_size){
                   debug(0) << debug_header_ <<"[Reuse Analysis Error]: "
-                           << "More than 1024 bits are required to "
+                           << "More than " << max_size_bits << "bits are required to "
                               "allocate a register for the logical "
-                              "group:\n";
-                  assert(false);
+                              "group of broadcast elements:\n";
+                  auto ngroups = (int) std::ceil(group.extent_size / max_size) + 1;
+                  for(int i = 0; i < ngroups; i++) {
+                      Expr min = group.extent.min + i * max_size;
+                      Expr max = group.extent.min + (i+1) * max_size - 1;
+                      LogicalMemoryGroup physical_group;
+                      physical_group.name = group.name + "_" + to_string(i);
+                      physical_group.extent = Interval(min, max);
+                      physical_group.extent_size = max_size;
+                      for(int &id : group.ids) {
+                          Interval tmp(min, max);
+                          const Load *load = loads[id];
+                          tmp.include(load->index);
+/*                          debug(3) << debug_header_ <<
+                                    load->index << min << max << "\n";*/
+                          int diff1 = (int) simplify(physical_group.extent.min - tmp.min)
+                                        .as<IntImm>()->value;
+                          int diff2 = (int) simplify(physical_group.extent.max - tmp.max)
+                                  .as<IntImm>()->value;
+                          if(diff1 == 0 && diff2 == 0) {
+                              debug(3) << debug_header_ <<
+                                " Adding " << load->index << "\n";
+                              physical_group.ids.push_back(id);
+                          }
+                      }
+
+                      if(!physical_group.ids.empty())
+                          physical_memory_groups.push_back(physical_group);
+                  }
+
+                  //assert(false);
+                } else if(is_temporal_logical_group_smaller_than_256b_
+                        && group.extent_size <= max_size) {
+                    Expr min = group.extent.min +  max_size;
+                    Expr max = group.extent.min +  max_size - 1;
+                    group.extent_size = max_size;
+                    group.extent.include(Interval(min, max));
+                    physical_memory_groups.push_back(group);
+                } else {
+                    physical_memory_groups.push_back(group);
                 }
               } else {
                 debug(0) << debug_header_ <<"Extent size of a group is not an"
@@ -610,6 +669,14 @@ namespace Halide {
                 assert(false);
               }
             }
+
+            reuse_graph.logical_memory_groups_.erase(
+                    reuse_graph.logical_memory_groups_.begin(),
+                    reuse_graph.logical_memory_groups_.end());
+            reuse_graph.logical_memory_groups_.insert(
+                    reuse_graph.logical_memory_groups_.begin(),
+                    physical_memory_groups.begin(),
+                    physical_memory_groups.end());
 
             //Step-5: Analyze the alignment of a big vector register to
             // satisfy all loads in a group
@@ -668,6 +735,7 @@ namespace Halide {
         void ConvolutionsCompilerForAICore::DeclareAndInitializeLoads(
                 LogicalMemoryGroup *load_logical_memory_group,
                 int load_offset_from_logical_memory_group_base_address,
+                bool is_temporal,
                 string load_name) {
 
             bool is_load_larger_than_vector_length
@@ -678,7 +746,7 @@ namespace Halide {
                   (load_offset_from_logical_memory_group_base_address) / num_simd_lanes_;
 
             int load_range_end = 0;
-            if(is_load_larger_than_vector_length)
+            if(is_load_larger_than_vector_length && is_temporal)
               load_range_end =
                       (load_offset_from_logical_memory_group_base_address
                        + memory_operations_stride_length_*
@@ -935,6 +1003,17 @@ namespace Halide {
           if (num_simd_lanes_ == 8 && data_type_size_in_bits_ == 32) {
             start = to_string(offset_from_memory_group_base);
             offset_lo = is_operand_load_in_temporal_group ? "0x76543210" : "0";
+/*            if(is_operand_load_in_temporal_group) {
+                if(is_temporal_logical_group_smaller_than_256b_)
+                    offset_lo = "0";
+                else
+                    offset_lo = "0x76543210";
+            } else {
+                if(is_temporal_logical_group_smaller_than_256b_)
+                    offset_lo = "0";
+                else
+                    offset_lo = "0x76543210";
+            } */
             offset_hi = step = mini_square = "-1";
           } else if (num_simd_lanes_ == 16 && data_type_size_in_bits_ == 16) {
             if(is_operand_load_in_temporal_group) {
@@ -1064,8 +1143,8 @@ namespace Halide {
                               spatial_reuse_graph,
                               is_operand2_load_in_temporal_group);
 
-              assert(is_operand1_load_in_temporal_group
-                             ^ is_operand2_load_in_temporal_group);
+/*              assert(is_operand1_load_in_temporal_group
+                             ^ is_operand2_load_in_temporal_group);*/
 
               //Step-2: Perform MAC operations
               for(unsigned int vector_mac_counter = 0;
@@ -1080,11 +1159,13 @@ namespace Halide {
                     DeclareAndInitializeLoads(
                             operand1_memory_group,
                             vector_mac_col_operands.first,
+                            is_operand1_load_in_temporal_group,
                             operand1_load->name);
 
                     DeclareAndInitializeLoads(
                             operand2_memory_group,
                             vector_mac_col_operands.second,
+                            is_operand2_load_in_temporal_group,
                             operand2_load->name);
                   }
 
@@ -1401,6 +1482,22 @@ namespace Halide {
                                     << arithemtic_intensity << "\n";
         }
 
+        void ConvolutionsCompilerForAICore::visit(const Min *op) {
+            // clang doesn't support the ternary operator on OpenCL style vectors.
+            // See: https://bugs.llvm.org/show_bug.cgi?id=33103
+            if (op->type.is_scalar()) {
+                string a = print_expr(op->a);
+                string b = print_expr(op->b);
+                string str = "(" + a + " < " + b + ") ? (" + a + ") : (" + b + ")";
+                print_assignment(op->type, str);
+                //print_expr(Call::make(op->type, "::halide_cpp_min", {op->a, op->b}, Call::Extern));
+            } else {
+                ostringstream rhs;
+                rhs << print_type(op->type) << "::min(" << print_expr(op->a) << ", " << print_expr(op->b) << ")";
+                print_assignment(op->type, rhs.str());
+            }
+        }
+
         /** This method tries to extract a set of statements in a straight
          * line of code without any conditionals.
          */
@@ -1541,10 +1638,12 @@ namespace Halide {
               //Operand1 details:
               bool is_operand1_load_in_temporal_group;
               int operand1_offset_from_its_logical_memory_group_base;
+              auto op1 = is_temporal_logical_group_smaller_than_256b_ ?
+                            vector_mac.second : vector_mac.first;
 
               LogicalMemoryGroup *operand1_memory_group =
                   GetLogicalMemoryGroupInformationGivenALoad(
-                  vector_mac.first, temporal_reuse_graph,
+                  op1, temporal_reuse_graph,
                   spatial_reuse_graph,
                   is_operand1_load_in_temporal_group,
                   operand1_offset_from_its_logical_memory_group_base);
@@ -1552,10 +1651,12 @@ namespace Halide {
               //Operand2 details:
               bool is_operand2_load_in_temporal_group;
               int operand2_offset_from_its_logical_memory_group_base;
+              auto op2 = is_temporal_logical_group_smaller_than_256b_ ?
+                           vector_mac.first : vector_mac.second;
 
               LogicalMemoryGroup *operand2_memory_group =
                       GetLogicalMemoryGroupInformationGivenALoad(
-                      vector_mac.second, temporal_reuse_graph,
+                      op2, temporal_reuse_graph,
                       spatial_reuse_graph,
                       is_operand2_load_in_temporal_group,
                       operand2_offset_from_its_logical_memory_group_base);

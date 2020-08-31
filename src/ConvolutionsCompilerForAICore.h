@@ -37,6 +37,7 @@ namespace Halide {
             }
         };
 
+
         class LogicalMemoryGroup {
         public:
             //Id's of loads in their reuse graph
@@ -200,6 +201,8 @@ namespace Halide {
             //Total MAC operations in the innermost loop
             int total_mac_operations_ = 0;
 
+            int is_temporal_logical_group_smaller_than_256b_ = -1;
+
             //Using visit functions of c code generator in our code generators
             using CodeGen_C::visit;
 
@@ -217,6 +220,9 @@ namespace Halide {
 
             //Implemeting virtual method "visit" taking block of statements as input
             void visit(const Block *block) override;
+
+            //Implemeting virtual method "visit" taking min statement as input
+            void visit(const Min *op) override;
 
 
             //Step-1 of compiler: Extract straight line of code
@@ -285,6 +291,7 @@ namespace Halide {
             void DeclareAndInitializeLoads(
                     LogicalMemoryGroup *load_logical_memory_group,
                     int load_offset_from_logical_memory_group_base_address,
+                    bool is_temporal,
                     string load_name);
 
 

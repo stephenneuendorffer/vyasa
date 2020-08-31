@@ -936,7 +936,7 @@ private:
             iter->getName(name);
             debug(2) << "Section: " << name.str() << "\n";
 
-#if LLVM_VERSION >= 100
+#if LLVM_VERSION >= 0 //100
             // ignore errors, just leave strings empty
             auto e = iter->getContents();
             if (e) {
