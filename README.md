@@ -1,7 +1,15 @@
-# XHalide
-Halide framework to generate ME single core code for convolution-like kernels
--- Now working on 16-bit
+# Vyasa
 
+A Halide-based framework to generate single core code for convolution-like kernels,
+targetting the Xilinx Versal AIEngine architecture.
+
+see:
+P. Chatarasi, S. Neuendorffer, S. Bayliss, K. Vissers and V. Sarkar, "Vyasa: A High-Performance Vectorizing Compiler for Tensor Convolutions on the Xilinx AI Engine," 2020 IEEE High Performance Extreme Computing Conference (HPEC), 2020, pp. 1-10, doi: 10.1109/HPEC43674.2020.9286183.
+https://ieeexplore.ieee.org/document/9286183
+https://www.youtube.com/watch?v=Rd70OVtm35U
+
+Note that this is not a complete toolflow for Xilinx AIEngine devices and
+requires licenses for appropriate Xilinx tools to generate executable designs.
 
 # Halide
 
